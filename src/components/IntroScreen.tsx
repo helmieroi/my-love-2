@@ -47,7 +47,7 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
         </h1>
 
         <p className="max-w-md text-xl font-bold text-pink-soft/90 sm:text-2xl">
-قصائد كُتبت من القلب... من رولي إلى ليلي
+ من رولي
         </p>
 
         <motion.button
@@ -61,7 +61,7 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
             className="h-5 w-5 text-gold transition-transform group-hover:rotate-12"
             aria-hidden="true"
           />
-          اكتشف القصائد
+          اكتشف 
         </motion.button>
       </motion.div>
     </motion.div>
