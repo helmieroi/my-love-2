@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ */
+/*  Arabic typography — used for all DOM/HTML text (correct shaping)  */
+/* ------------------------------------------------------------------ */
+@font-face {
+  font-family: "Noto Naskh Arabic";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/NotoNaskhArabic-Regular.ttf") format("truetype");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Theme tokens (Tailwind v4 CSS-first config)                        */
+/* ------------------------------------------------------------------ */
+@theme {
+  --font-arabic: "Noto Naskh Arabic", "Segoe UI", system-ui, sans-serif;
+
+  --color-ink: #0a0206;
+  --color-burgundy: #3a0713;
+  --color-burgundy-deep: #1c0308;
+  --color-rose: #e11d48;
+  --color-rose-soft: #fb7185;
+  --color-pink-soft: #fbcfe8;
+  --color-gold: #f5c563;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Base                                                               */
+/* ------------------------------------------------------------------ */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+  background-color: var(--color-ink);
+  color: var(--color-pink-soft);
+  font-family: var(--font-arabic);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+#root {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+}
+
+/* Deep cinematic radial backdrop behind the WebGL canvas */
+#root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(120% 90% at 50% 18%, #4a0a1c 0%, #23050f 42%, #0a0206 100%);
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+
+/* Hide scrollbars while keeping scroll behaviour */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE / old Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Floating 3D poem-title label (rendered through drei <Html/>) */
+.poem-label {
+  user-select: none;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font-arabic);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff5f7;
+  padding: 0.15em 0.35em;
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.35s ease,
+    text-shadow 0.35s ease,
+    opacity 0.6s ease;
+  text-shadow:
+    0 0 6px rgba(251, 113, 133, 0.55),
+    0 0 16px rgba(225, 29, 72, 0.35);
+}
+
+.poem-label:hover,
+.poem-label--active {
+  color: #ffffff;
+  transform: scale(1.28);
+  text-shadow:
+    0 0 10px rgba(255, 255, 255, 0.9),
+    0 0 22px rgba(251, 113, 133, 0.9),
+    0 0 40px rgba(225, 29, 72, 0.7);
+}
+
+/* Soft appear/disappear used by the intro + titles */
+@keyframes floatPulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
