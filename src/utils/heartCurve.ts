@@ -14,18 +14,13 @@ export type HeartCurve = {
 };
 
 /**
- * Build a reusable heart-shaped curve from the classic parametric formula:
+ * Sample the classic parametric heart:
  *
  *   x = 16 · sin³(t)
  *   y = 13·cos(t) − 5·cos(2t) − 2·cos(3t) − cos(4t)
- *
- * The raw coordinates are centered and uniformly scaled so the whole heart
- * fits inside `size` world units (measured on the taller axis), keeping it
- * comfortably within the camera view.
  */
-export function buildHeartCurve(size = 11, segments = 256): HeartCurve {
+function rawHeartPoints(segments: number): THREE.Vector2[] {
   const raw: THREE.Vector2[] = [];
-
   for (let i = 0; i < segments; i++) {
     const t = (i / segments) * Math.PI * 2;
     const x = 16 * Math.pow(Math.sin(t), 3);
@@ -36,19 +31,69 @@ export function buildHeartCurve(size = 11, segments = 256): HeartCurve {
       Math.cos(4 * t);
     raw.push(new THREE.Vector2(x, y));
   }
+  return raw;
+}
 
-  // Bounding box for normalization.
+function measure(points: THREE.Vector2[]) {
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-  for (const p of raw) {
+  for (const p of points) {
     minX = Math.min(minX, p.x);
     maxX = Math.max(maxX, p.x);
     minY = Math.min(minY, p.y);
     maxY = Math.max(maxY, p.y);
   }
+  return { minX, maxX, minY, maxY };
+}
 
+/**
+ * Width ÷ height of the heart outline. Scale-independent, so it can be used to
+ * work out a fitting `size` before the curve itself is built. The heart is
+ * wider than it is tall, which makes its width the axis `size` measures.
+ */
+export const HEART_ASPECT = (() => {
+  const b = measure(rawHeartPoints(256));
+  return (b.maxX - b.minX) / (b.maxY - b.minY);
+})();
+
+/**
+ * Largest heart `size` that still fits the viewport at a given camera distance.
+ *
+ * A perspective camera's `fov` is vertical, so a tall, narrow phone screen shows
+ * far fewer world units across than a desktop one — a fixed size overflows the
+ * sides. `margin` leaves room for the labels riding on the outline.
+ */
+export function fitHeartSize(
+  viewportAspect: number,
+  cameraZ: number,
+  fovDeg: number,
+  margin = 0.8,
+  min = 5,
+  max = 11
+): number {
+  const visibleHeight = 2 * cameraZ * Math.tan((fovDeg * Math.PI) / 360);
+  const visibleWidth = visibleHeight * viewportAspect;
+
+  // `size` is the heart's width; its height is therefore size / HEART_ASPECT.
+  const byWidth = visibleWidth * margin;
+  const byHeight = visibleHeight * margin * HEART_ASPECT;
+
+  return Math.min(max, Math.max(min, Math.min(byWidth, byHeight)));
+}
+
+/**
+ * Build a reusable heart-shaped curve.
+ *
+ * The raw coordinates are centered and uniformly scaled so the whole heart
+ * fits inside `size` world units (measured on the longer axis), keeping it
+ * comfortably within the camera view.
+ */
+export function buildHeartCurve(size = 11, segments = 256): HeartCurve {
+  const raw = rawHeartPoints(segments);
+
+  const { minX, maxX, minY, maxY } = measure(raw);
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
   const span = Math.max(maxX - minX, maxY - minY);

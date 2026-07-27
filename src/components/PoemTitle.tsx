@@ -1,4 +1,11 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
@@ -8,9 +15,26 @@ import type { HeartCurve } from "../utils/heartCurve";
 
 const TAU = Math.PI * 2;
 
+/** Fade-out duration before a slot swaps to its next poem (matches CSS). */
+const SWAP_FADE_MS = 450;
+
+/**
+ * Labels are centred on the curve, so half of a wide title hangs past it. On a
+ * phone the outline sits close enough to the side edges that a long title would
+ * clip, so the ring rides inside the heart there.
+ *
+ * The squeeze is mostly horizontal: a portrait screen has plenty of vertical
+ * room, and clipping only ever happens left/right.
+ */
+const LABEL_INSET_X_MOBILE = 0.7;
+const LABEL_INSET_Y_MOBILE = 0.9;
+
 type PoemTitleProps = {
+  /** The poem this orbit slot currently carries; may change over time. */
   poem: Poem;
+  /** Slot position around the loop. */
   index: number;
+  /** Number of slots orbiting simultaneously. */
   total: number;
   curve: HeartCurve;
   /** Base traversal speed (progress per second). */
@@ -24,7 +48,11 @@ type PoemTitleProps = {
 };
 
 /**
- * A single poem title that continuously glides around the heart outline.
+ * A single orbit slot: a poem title that continuously glides around the heart.
+ *
+ * Slots are permanent — only the poem they carry rotates — so the motion stays
+ * perfectly smooth while the scene cycles through the full collection. When the
+ * `poem` prop changes the label fades out, swaps text, and fades back in.
  *
  * Position is driven entirely through refs inside `useFrame` (no per-frame
  * React state). The label itself is real DOM (via drei <Html/>) so Arabic
@@ -43,6 +71,10 @@ function PoemTitle({
 }: PoemTitleProps) {
   const groupRef = useRef<THREE.Group>(null);
   const hoveredRef = useRef(false);
+
+  // The poem actually painted right now — trails `poem` by one fade.
+  const [shown, setShown] = useState(poem);
+  const [swapping, setSwapping] = useState(false);
 
   // Even initial spacing around the loop.
   const offset = index / total;
@@ -65,8 +97,35 @@ function PoemTitle({
     const elapsed = state.clock.elapsedTime;
     const zFloat = Math.sin(elapsed * 0.6 + offset * TAU) * 0.6;
 
-    group.position.set(tmp.x, tmp.y, zFloat);
+    // The curve is centred on the origin, so scaling the sampled point pulls
+    // the label toward the heart's middle.
+    const insetX = isMobile ? LABEL_INSET_X_MOBILE : 1;
+    const insetY = isMobile ? LABEL_INSET_Y_MOBILE : 1;
+    group.position.set(tmp.x * insetX, tmp.y * insetY, zFloat);
   });
+
+  // Cross-fade whenever this slot is handed a different poem.
+  useEffect(() => {
+    if (poem.id === shown.id) return;
+    setSwapping(true);
+    const timer = setTimeout(() => {
+      setShown(poem);
+      setSwapping(false);
+    }, SWAP_FADE_MS);
+    return () => clearTimeout(timer);
+  }, [poem, shown.id]);
+
+  // The staggered reveal is a one-off; afterwards fades must be immediate so
+  // swapping titles don't lag behind by the stagger delay.
+  const [introDone, setIntroDone] = useState(false);
+  useEffect(() => {
+    if (!started) {
+      setIntroDone(false);
+      return;
+    }
+    const timer = setTimeout(() => setIntroDone(true), index * 80 + 800);
+    return () => clearTimeout(timer);
+  }, [started, index]);
 
   const handleEnter = useCallback(() => {
     hoveredRef.current = true;
@@ -79,8 +138,8 @@ function PoemTitle({
   }, []);
 
   const handleClick = useCallback(() => {
-    onSelect(poem);
-  }, [onSelect, poem]);
+    onSelect(shown);
+  }, [onSelect, shown]);
 
   // Safety cleanup: never leave the cursor stuck on unmount.
   useEffect(() => {
@@ -89,6 +148,8 @@ function PoemTitle({
     };
   }, []);
 
+  const interactive = started && !swapping;
+
   return (
     <group ref={groupRef}>
       <Html
@@ -96,15 +157,15 @@ function PoemTitle({
         distanceFactor={isMobile ? 7 : 9}
         zIndexRange={[20, 0]}
         occlude={false}
-        pointerEvents={started ? "auto" : "none"}
+        pointerEvents={interactive ? "auto" : "none"}
       >
         <span
           className="poem-label"
           dir="rtl"
           lang="ar"
           role="button"
-          tabIndex={started ? 0 : -1}
-          aria-label={`افتح قصيدة ${poem.title}`}
+          tabIndex={interactive ? 0 : -1}
+          aria-label={`افتح قصيدة ${shown.title}`}
           onClick={handleClick}
           onPointerEnter={handleEnter}
           onPointerLeave={handleLeave}
@@ -115,13 +176,13 @@ function PoemTitle({
             }
           }}
           style={{
-            opacity: started ? 1 : 0,
-            pointerEvents: started ? "auto" : "none",
-            transitionDelay: `${index * 0.08}s`,
-            fontSize: isMobile ? "1.05rem" : "1.35rem",
+            opacity: interactive ? 1 : 0,
+            pointerEvents: interactive ? "auto" : "none",
+            transitionDelay: introDone ? "0s" : `${index * 0.08}s`,
+            fontSize: isMobile ? "1rem" : "1.35rem",
           }}
         >
-          {poem.title}
+          {shown.title}
         </span>
       </Html>
     </group>

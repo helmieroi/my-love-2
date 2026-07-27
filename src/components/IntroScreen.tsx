@@ -47,7 +47,7 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
         </h1>
 
         <p className="max-w-md text-xl font-bold text-pink-soft/90 sm:text-2xl">
-          قصائد كُتبت من القلب
+قصائد كُتبت من القلب... من رولي إلى ليلي
         </p>
 
         <motion.button

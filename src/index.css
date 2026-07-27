@@ -87,8 +87,17 @@ canvas {
   display: none;
 }
 
+/* The index panel supplies its own clear button — hide the native one so two
+   different × glyphs don't sit side by side in the search field. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Floating 3D poem-title label (rendered through drei <Html/>) */
 .poem-label {
+  position: relative;
   user-select: none;
   cursor: pointer;
   white-space: nowrap;
@@ -101,10 +110,23 @@ canvas {
     transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
     color 0.35s ease,
     text-shadow 0.35s ease,
-    opacity 0.6s ease;
+    /* Matches SWAP_FADE_MS in PoemTitle so batches cross-fade cleanly. */
+    opacity 0.45s ease;
   text-shadow:
     0 0 6px rgba(251, 113, 133, 0.55),
     0 0 16px rgba(225, 29, 72, 0.35);
+}
+
+/* The titles render around 15px tall on a phone — too small to tap reliably.
+   This pads the hit area out without growing the layout box, which the
+   viewport-fit sizing in heartCurve.ts depends on.
+
+   Vertical padding stays modest: titles bunch up around the heart's bottom
+   cusp, and a taller hit area there would start stealing its neighbour's taps. */
+.poem-label::before {
+  content: "";
+  position: absolute;
+  inset: -0.5em -0.6em;
 }
 
 .poem-label:hover,

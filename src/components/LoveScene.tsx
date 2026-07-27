@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RefObject } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import { poems } from "../data/poems";
 import type { Poem } from "../types/poem";
-import { buildHeartCurve } from "../utils/heartCurve";
+import { buildHeartCurve, fitHeartSize } from "../utils/heartCurve";
 import BackgroundParticles from "./BackgroundParticles";
 import CameraController from "./CameraController";
 import HeartPath from "./HeartPath";
@@ -21,6 +21,93 @@ type LoveSceneProps = {
 const BASE_SPEED = 0.04;
 
 /**
+ * How many titles orbit at once. The heart only has so much room before labels
+ * collide, and every orbiting label is a live DOM node transformed each frame —
+ * so the ring stays small and rotates its contents instead of showing all 100.
+ */
+const VISIBLE_DESKTOP = 10;
+const VISIBLE_MOBILE = 6;
+
+/** How long a batch of titles stays on the heart before the next fades in. */
+const CYCLE_MS = 11000;
+
+const CAMERA_FOV = 45;
+
+/** Where CameraController settles once the intro is dismissed. */
+const CAMERA_Z_STARTED = 18;
+
+type HeartContentsProps = LoveSceneProps;
+
+/**
+ * The heart outline plus its ring of orbiting titles.
+ *
+ * Lives inside the <Canvas/> so it can size the curve against the real drawing
+ * buffer — a tall phone screen shows far fewer world units across than a
+ * desktop one, and a fixed size would run off the sides.
+ */
+function HeartContents({
+  started,
+  isMobile,
+  pausedRef,
+  onSelectPoem,
+}: HeartContentsProps) {
+  const width = useThree((state) => state.size.width);
+  const height = useThree((state) => state.size.height);
+
+  const curve = useMemo(
+    () =>
+      buildHeartCurve(
+        fitHeartSize(width / height, CAMERA_Z_STARTED, CAMERA_FOV),
+        256
+      ),
+    [width, height]
+  );
+
+  const visibleCount = Math.min(
+    isMobile ? VISIBLE_MOBILE : VISIBLE_DESKTOP,
+    poems.length
+  );
+
+  // Index of the first poem in the batch currently on the heart.
+  const [batchStart, setBatchStart] = useState(0);
+
+  useEffect(() => {
+    if (!started || poems.length <= visibleCount) return;
+    const id = setInterval(() => {
+      // Don't swap titles out from under someone who is reading.
+      if (pausedRef.current) return;
+      setBatchStart((prev) => (prev + visibleCount) % poems.length);
+    }, CYCLE_MS);
+    return () => clearInterval(id);
+  }, [started, visibleCount, pausedRef]);
+
+  return (
+    <>
+      <HeartPath points={curve.linePoints} pausedRef={pausedRef} />
+
+      {/*
+        One permanent slot per orbit position, keyed by slot rather than poem:
+        the slots keep gliding while the poems they carry rotate underneath.
+      */}
+      {Array.from({ length: visibleCount }, (_, slot) => (
+        <PoemTitle
+          key={slot}
+          poem={poems[(batchStart + slot) % poems.length]}
+          index={slot}
+          total={visibleCount}
+          curve={curve}
+          baseSpeed={BASE_SPEED}
+          pausedRef={pausedRef}
+          started={started}
+          isMobile={isMobile}
+          onSelect={onSelectPoem}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
  * The full-screen React Three Fiber scene: heart outline, orbiting poem
  * titles, glowing particles, a star field and the eased camera.
  * Default-exported so it can be `React.lazy`-loaded.
@@ -31,15 +118,10 @@ export default function LoveScene({
   pausedRef,
   onSelectPoem,
 }: LoveSceneProps) {
-  const curve = useMemo(
-    () => buildHeartCurve(isMobile ? 9 : 11, 256),
-    [isMobile]
-  );
-
   return (
     <Canvas
       className="absolute inset-0"
-      camera={{ position: [0, 0, 22], fov: 45 }}
+      camera={{ position: [0, 0, 22], fov: CAMERA_FOV }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: "high-performance" }}
     >
@@ -64,22 +146,12 @@ export default function LoveScene({
 
       <BackgroundParticles count={isMobile ? 250 : 600} />
 
-      <HeartPath points={curve.linePoints} pausedRef={pausedRef} />
-
-      {poems.map((poem, index) => (
-        <PoemTitle
-          key={poem.id}
-          poem={poem}
-          index={index}
-          total={poems.length}
-          curve={curve}
-          baseSpeed={BASE_SPEED}
-          pausedRef={pausedRef}
-          started={started}
-          isMobile={isMobile}
-          onSelect={onSelectPoem}
-        />
-      ))}
+      <HeartContents
+        started={started}
+        isMobile={isMobile}
+        pausedRef={pausedRef}
+        onSelectPoem={onSelectPoem}
+      />
 
       <CameraController
         started={started}
